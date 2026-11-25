@@ -1,0 +1,150 @@
+/*
+ * Styles of the live display building blocks in this folder, shared by the
+ * public site and the TV page.
+ *
+ * Plain CSS outside every cascade layer, on purpose. The TV page must work on
+ * Chromium 80-98, which drops whole layer blocks and with them every Tailwind
+ * utility, so these components cannot be built from utilities. For the same
+ * reason nothing here uses the inset shorthand, flexbox gap, nesting or
+ * newer selectors.
+ *
+ * Three rules keep this file compatible with both pages:
+ *   1. A component's ROOT class only sets what no page wants to change
+ *      (tabular figures, no wrapping). Unlayered rules beat every Tailwind
+ *      utility, so a font size or a colour set here could not be overridden
+ *      with a class from the site. Size, family and colour come from the
+ *      `className` prop: `time-numerals text-time` on the site, `tv-time` or
+ *      `tv-clock` on the TV.
+ *   2. Rules for the small parts (AM/PM, seconds) use two classes. The TV
+ *      stage resets font size, weight and margin on everything inside it with
+ *      one-class specificity; two classes win whatever the order of the
+ *      stylesheets.
+ *   3. Sizes are in em, so a part follows the size its page gives the whole.
+ *
+ * Colours are the design tokens, which resolve inside the TV themes too.
+ */
+
+/* Text for screen readers only. Tailwind's own helper does not reach old TV browsers. */
+.display-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  -webkit-clip-path: inset(50%);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * A value that is not known until the page has mounted (the clock, the
+ * countdown). The placeholder has the shape of the real thing and is
+ * invisible, so the layout is settled before the value appears.
+ */
+.display-pending {
+  visibility: hidden;
+}
+
+/* The moment a live value replaces its placeholder. */
+.display-appear {
+  animation: display-appear 240ms ease-out both;
+}
+
+@keyframes display-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .display-appear {
+    animation: none;
+  }
+}
+
+/* --- TimeText ------------------------------------------------------------ */
+
+.display-time {
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+
+/* AM/PM: half the size of the digits, but never below the smallest text size of the product. */
+.display-time .display-time-period {
+  margin-left: 0.08em;
+  font-size: 0.5em;
+  font-size: max(0.5em, 0.8125rem);
+  font-weight: inherit;
+  letter-spacing: 0.03em;
+}
+
+/* --- Countdown ----------------------------------------------------------- */
+
+.display-countdown {
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- LiveClock ----------------------------------------------------------- */
+
+.display-clock {
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+
+/* Seconds and AM/PM beside the clock: the proportions of the TV design. */
+.display-clock .display-clock-minor {
+  font-size: 0.42em;
+  font-weight: inherit;
+  letter-spacing: -0.01em;
+}
+
+.display-clock .display-clock-period {
+  margin-left: 0.12em;
+}
+
+/* --- PrayerName ---------------------------------------------------------- */
+
+.display-prayer-name .display-prayer-name-arabic {
+  margin-left: 0.25em;
+}
+
+.display-prayer-name-stacked .display-prayer-name-latin,
+.display-prayer-name-stacked .display-prayer-name-arabic {
+  display: block;
+  margin-left: 0;
+}
+
+/* --- ConnectionBadge ----------------------------------------------------- */
+
+.display-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3em 0.7em;
+  border: 1px solid var(--line);
+  border-radius: 0.45em;
+  background-color: var(--surface-sunken);
+  color: var(--fg-muted);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.display-badge-offline {
+  border-color: var(--warning-line);
+  background-color: var(--warning-soft);
+  color: var(--warning-fg);
+}
+
+.display-badge .display-badge-icon {
+  margin-right: 0.45em;
+}
+
+.display-badge .display-badge-label {
+  font-weight: 600;
+}
+
+.display-badge .display-badge-detail {
+  margin-left: 0.6em;
+}

@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+.next
+.next-*
+data
+test-results
+playwright-report
+e2e
+samples
+*.md
+.env*
+!.env.example
+Dockerfile
+docker-compose.yml

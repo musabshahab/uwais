@@ -1,0 +1,1119 @@
+/*
+ * The TV display (/tv): one full-screen page, read from across a prayer hall.
+ *
+ * Rules of this file (see section 6 of globals.css and the design guide):
+ *   - Plain CSS, outside every cascade layer. Chromium 80-98, which is what
+ *     TV boxes and signage players run, drops layered rules, so no Tailwind
+ *     utility works on this page. Everything is a `tvx-` class from here, a
+ *     `tv-` class from globals.css or a `display-` class from the shared
+ *     display components.
+ *   - Nothing those browsers lack: no `inset`, no flexbox `gap`, no
+ *     `aspect-ratio`, no `:where()`/`:is()`, no `color-mix()`, no nesting, no
+ *     container queries. Boxes are placed with top/left/width/height.
+ *   - Every length is a multiple of `--tv-u`, so the one layout fills 720p,
+ *     1080p and 4K alike. The page never scrolls.
+ *   - Colours are the design tokens only; `[data-tv-theme]` on the stage
+ *     picks the night or the day set.
+ *
+ * Landscape and portrait
+ * ----------------------
+ * The two layouts differ only in the custom properties of section 2, which
+ * the rules below read. A media query cannot do the whole job: a screen
+ * mounted sideways (`?rotate=90`) has a landscape viewport but needs the
+ * portrait layout, and the other way round. So the stage carries
+ * `tvx-upright` or `tvx-sideways`, and the portrait values apply to an
+ * upright stage in a portrait viewport and to a sideways stage in a
+ * landscape one. Keep the two portrait blocks identical.
+ *
+ * This file must load after globals.css: its one-class rules override the
+ * `.tv-stage *` reset by coming later. The TV layout imports it for that.
+ */
+
+/* ==========================================================================
+   1. Stage: unit, rotation, backdrop, frame
+   ========================================================================== */
+
+.tvx-stage {
+  /* Extra margin for sets that overscan, as a fraction of the screen (?inset=). */
+  --tvx-inset: 0;
+
+  /*
+   * The TV unit of globals.css, scaled down by the extra margin so the whole
+   * layout shrinks with it. A custom property is computed where it is
+   * declared, so everything derived from the unit is declared again here.
+   */
+  --tv-u: calc(clamp(4px, min(0.625vw, 1.1111vh), 48px) * (1 - 2 * var(--tvx-inset)));
+  --tv-safe: calc(var(--tv-u) * 4.5);
+  --tv-gap: calc(var(--tv-u) * 2);
+  --tv-text-xs: calc(var(--tv-u) * 1.75);
+  --tv-text-sm: calc(var(--tv-u) * 2.25);
+  --tv-text-md: calc(var(--tv-u) * 3);
+  --tv-text-lg: calc(var(--tv-u) * 4);
+  --tv-text-xl: calc(var(--tv-u) * 5.5);
+  --tv-text-2xl: calc(var(--tv-u) * 8);
+  --tv-text-clock: calc(var(--tv-u) * 17);
+
+  /* Shared measures. */
+  --tvx-hairline: calc(var(--tv-u) * 0.15);
+  --tvx-radius: calc(var(--tv-u) * 1.5);
+  --tvx-pad: calc(var(--tv-u) * 3);
+  --tvx-margin: calc(var(--tv-safe) + var(--tvx-inset) * 100%);
+}
+
+@media (orientation: portrait) {
+  .tvx-stage {
+    --tv-u: calc(clamp(4px, min(1.1111vw, 0.625vh), 48px) * (1 - 2 * var(--tvx-inset)));
+  }
+}
+
+/* Somebody is moving the pointer: show it until it has been still for a while. */
+.tvx-stage.tvx-stage-pointer {
+  cursor: default;
+}
+
+/*
+ * Rotation for a screen whose player cannot turn its output. The stage keeps
+ * its own upright coordinates and is turned as a whole. A quarter turn swaps
+ * its width and height; the unit needs no change, because the smaller of
+ * width/160 and height/90 of the viewport is also the smaller of height/90
+ * and width/160 of the turned stage.
+ */
+.tvx-stage.tvx-rotate-180 {
+  transform: rotate(180deg);
+}
+
+.tvx-stage.tvx-rotate-90 {
+  width: 100vh;
+  height: 100vw;
+  transform-origin: 0 0;
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.tvx-stage.tvx-rotate-270 {
+  width: 100vh;
+  height: 100vw;
+  transform-origin: 0 0;
+  transform: rotate(-90deg) translateX(-100%);
+}
+
+/* The lattice: a texture behind everything, never a picture. */
+.tvx-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--accent);
+  opacity: 0.07;
+  pointer-events: none;
+}
+
+[data-tv-theme="day"] > .tvx-backdrop {
+  color: var(--brand-fg);
+  opacity: 0.06;
+}
+
+/* The content area inside the overscan margin. */
+.tvx-frame {
+  position: absolute;
+  top: var(--tvx-margin);
+  left: var(--tvx-margin);
+  width: calc(100% - 2 * var(--tvx-margin));
+  height: calc(100% - 2 * var(--tvx-margin));
+  display: grid;
+  grid-template-columns: var(--tvx-frame-columns);
+  grid-template-rows: var(--tvx-frame-rows);
+  grid-template-areas: var(--tvx-frame-areas);
+  grid-column-gap: calc(var(--tv-u) * 5);
+}
+
+/* ==========================================================================
+   2. Layout values: landscape by default, portrait below
+   ========================================================================== */
+
+.tvx-stage {
+  --tvx-frame-columns: calc(var(--tv-u) * 58) minmax(0, 1fr);
+  --tvx-frame-rows: minmax(0, 1fr) auto;
+  --tvx-frame-areas: "side table" "band band";
+
+  --tvx-side-align: flex-start;
+  --tvx-side-text: left;
+  --tvx-side-space: 0px;
+  --tvx-brand-size: calc(var(--tv-u) * 7);
+  --tvx-name-regular: calc(var(--tv-u) * 4.4);
+  --tvx-name-compact: calc(var(--tv-u) * 3.3);
+  --tvx-name-dense: calc(var(--tv-u) * 2.7);
+  --tvx-clock-size: calc(var(--tv-u) * 18.5);
+  --tvx-date-size: calc(var(--tv-u) * 3.5);
+  --tvx-hijri-size: calc(var(--tv-u) * 2.7);
+
+  --tvx-next-display: block;
+  --tvx-next-pad: calc(var(--tv-u) * 2.2) var(--tvx-pad) calc(var(--tv-u) * 2.6);
+  --tvx-next-label-size: calc(var(--tv-u) * 3.5);
+  --tvx-next-count-size: calc(var(--tv-u) * 10.5);
+  --tvx-next-count-space: calc(var(--tv-u) * 1.2);
+
+  --tvx-time-column: calc(var(--tv-u) * 19.5);
+  --tvx-head-height: calc(var(--tv-u) * 5.5);
+  --tvx-prayer-size: calc(var(--tv-u) * 4.6);
+  --tvx-rows-space: calc(var(--tv-u) * 0.8);
+  --tvx-tag-position: static;
+  --tvx-tag-shift: none;
+  --tvx-tag-space: 0 0 0 calc(var(--tv-u) * 1.8);
+  --tvx-time-size: calc(var(--tv-u) * 6.4);
+  --tvx-slot-size: calc(var(--tv-u) * 3.8);
+  --tvx-slot-grid-size: calc(var(--tv-u) * 3.1);
+
+  --tvx-band-height: calc(var(--tv-u) * 12);
+  --tvx-band-direction: row;
+  --tvx-band-align: center;
+  --tvx-band-label-space: 0 calc(var(--tv-u) * 2.4) 0 0;
+  --tvx-band-lines-regular: 2;
+  --tvx-band-lines-compact: 3;
+  --tvx-band-text-flex: 1 1 auto;
+  --tvx-band-marks-position: static;
+
+  --tvx-nodata-title-size: calc(var(--tv-u) * 5.6);
+}
+
+@media (orientation: portrait) {
+  .tvx-stage.tvx-upright {
+    --tvx-frame-columns: minmax(0, 1fr);
+    --tvx-frame-rows: auto minmax(0, 1fr) auto;
+    --tvx-frame-areas: "side" "table" "band";
+
+    --tvx-side-align: center;
+    --tvx-side-text: center;
+    --tvx-side-space: calc(var(--tv-u) * 3.5);
+    --tvx-brand-size: calc(var(--tv-u) * 7.5);
+    --tvx-name-regular: calc(var(--tv-u) * 4.8);
+    --tvx-name-compact: calc(var(--tv-u) * 3.6);
+    --tvx-name-dense: calc(var(--tv-u) * 2.9);
+    --tvx-clock-size: calc(var(--tv-u) * 24);
+    --tvx-date-size: calc(var(--tv-u) * 4);
+    --tvx-hijri-size: calc(var(--tv-u) * 3);
+
+    --tvx-next-display: flex;
+    --tvx-next-pad: calc(var(--tv-u) * 2) var(--tvx-pad);
+    --tvx-next-label-size: calc(var(--tv-u) * 3.6);
+    --tvx-next-count-size: calc(var(--tv-u) * 9);
+    --tvx-next-count-space: 0px;
+
+    --tvx-time-column: calc(var(--tv-u) * 20);
+    --tvx-head-height: calc(var(--tv-u) * 6);
+    --tvx-prayer-size: calc(var(--tv-u) * 5);
+    /* Room for a legend on the first row, clear of the heading. */
+    --tvx-rows-space: calc(var(--tv-u) * 2.2);
+    --tvx-tag-position: absolute;
+    --tvx-tag-shift: translateY(-50%);
+    --tvx-tag-space: 0;
+    --tvx-time-size: calc(var(--tv-u) * 6.6);
+    --tvx-slot-size: calc(var(--tv-u) * 4.2);
+    --tvx-slot-grid-size: calc(var(--tv-u) * 3.4);
+
+    --tvx-band-height: calc(var(--tv-u) * 19);
+    --tvx-band-direction: column;
+    --tvx-band-align: flex-start;
+    --tvx-band-label-space: 0 0 calc(var(--tv-u) * 0.6) 0;
+    --tvx-band-lines-regular: 3;
+    --tvx-band-lines-compact: 4;
+    --tvx-band-text-flex: 0 1 auto;
+    --tvx-band-marks-position: absolute;
+
+    --tvx-nodata-title-size: calc(var(--tv-u) * 6);
+  }
+}
+
+@media (orientation: landscape) {
+  .tvx-stage.tvx-sideways {
+    --tvx-frame-columns: minmax(0, 1fr);
+    --tvx-frame-rows: auto minmax(0, 1fr) auto;
+    --tvx-frame-areas: "side" "table" "band";
+
+    --tvx-side-align: center;
+    --tvx-side-text: center;
+    --tvx-side-space: calc(var(--tv-u) * 3.5);
+    --tvx-brand-size: calc(var(--tv-u) * 7.5);
+    --tvx-name-regular: calc(var(--tv-u) * 4.8);
+    --tvx-name-compact: calc(var(--tv-u) * 3.6);
+    --tvx-name-dense: calc(var(--tv-u) * 2.9);
+    --tvx-clock-size: calc(var(--tv-u) * 24);
+    --tvx-date-size: calc(var(--tv-u) * 4);
+    --tvx-hijri-size: calc(var(--tv-u) * 3);
+
+    --tvx-next-display: flex;
+    --tvx-next-pad: calc(var(--tv-u) * 2) var(--tvx-pad);
+    --tvx-next-label-size: calc(var(--tv-u) * 3.6);
+    --tvx-next-count-size: calc(var(--tv-u) * 9);
+    --tvx-next-count-space: 0px;
+
+    --tvx-time-column: calc(var(--tv-u) * 20);
+    --tvx-head-height: calc(var(--tv-u) * 6);
+    --tvx-prayer-size: calc(var(--tv-u) * 5);
+    /* Room for a legend on the first row, clear of the heading. */
+    --tvx-rows-space: calc(var(--tv-u) * 2.2);
+    --tvx-tag-position: absolute;
+    --tvx-tag-shift: translateY(-50%);
+    --tvx-tag-space: 0;
+    --tvx-time-size: calc(var(--tv-u) * 6.6);
+    --tvx-slot-size: calc(var(--tv-u) * 4.2);
+    --tvx-slot-grid-size: calc(var(--tv-u) * 3.4);
+
+    --tvx-band-height: calc(var(--tv-u) * 19);
+    --tvx-band-direction: column;
+    --tvx-band-align: flex-start;
+    --tvx-band-label-space: 0 0 calc(var(--tv-u) * 0.6) 0;
+    --tvx-band-lines-regular: 3;
+    --tvx-band-lines-compact: 4;
+    --tvx-band-text-flex: 0 1 auto;
+    --tvx-band-marks-position: absolute;
+
+    --tvx-nodata-title-size: calc(var(--tv-u) * 6);
+  }
+}
+
+/* ==========================================================================
+   3. Side column: name, clock, date, next event
+   ========================================================================== */
+
+.tvx-side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin-bottom: var(--tvx-side-space);
+  text-align: var(--tvx-side-text);
+}
+
+.tvx-brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: var(--tvx-side-align);
+  min-height: var(--tvx-brand-size);
+}
+
+/* LogoMark is sized 1em; this sets the em. */
+.tvx-brand-mark {
+  flex: none;
+  margin-right: calc(var(--tv-u) * 2);
+  font-size: var(--tvx-brand-size);
+}
+
+.tvx-brand-name {
+  min-width: 0;
+  overflow: hidden;
+  line-height: 1.12;
+  text-align: left;
+  /* Up to two lines, then an ellipsis: a name never pushes the clock away. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.tvx-brand-name-regular {
+  font-size: var(--tvx-name-regular);
+  -webkit-line-clamp: 1;
+}
+
+.tvx-brand-name-compact {
+  font-size: var(--tvx-name-compact);
+}
+
+/* The longest name the settings allow (80 characters) fits in three lines of this size. */
+.tvx-brand-name-dense {
+  font-size: var(--tvx-name-dense);
+  -webkit-line-clamp: 3;
+}
+
+/* The clock and the date, centred in the room between the name and the panel. */
+.tvx-now {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: var(--tvx-side-align);
+  justify-content: center;
+  min-height: 0;
+  padding: var(--tvx-side-space) 0;
+}
+
+.tvx-clock {
+  display: block;
+  font-size: var(--tvx-clock-size);
+}
+
+/* AM/PM and the seconds, in a narrow column after the minutes. */
+.tvx-clock .tvx-clock-side {
+  margin-left: 0.06em;
+  color: var(--accent-fg);
+  font-size: 0.34em;
+  letter-spacing: 0;
+}
+
+/*
+ * With both, the seconds sit on the baseline of the clock and AM/PM is lifted
+ * above them. The column is an inline block whose only line is the seconds,
+ * which is what puts them on the clock's baseline whatever the font.
+ */
+.tvx-clock .tvx-clock-side-stacked {
+  position: relative;
+  display: inline-block;
+}
+
+.tvx-clock-side-stacked .tvx-clock-period {
+  position: absolute;
+  bottom: 1.38em;
+  left: 0.04em;
+  font-size: 0.6em;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.tvx-dates {
+  margin-top: calc(var(--tv-u) * 1.8);
+}
+
+.tvx-dates .tvx-date {
+  display: block;
+  font-size: var(--tvx-date-size);
+  line-height: 1.15;
+}
+
+.tvx-dates .tvx-hijri {
+  display: block;
+  margin-top: calc(var(--tv-u) * 0.7);
+  color: var(--fg-muted);
+  font-size: var(--tvx-hijri-size);
+  line-height: 1.2;
+}
+
+/* Status chips: nothing while all is well. */
+.tvx-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: var(--tvx-side-align);
+  max-width: 100%;
+  font-size: var(--tv-text-xs);
+}
+
+/* Nothing here may be wider than the column, however long its text. */
+.tvx-status > span {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tvx-status .tvx-status-chip {
+  max-width: 100%;
+  margin-top: calc(var(--tv-u) * 1.6);
+  margin-right: calc(var(--tv-u) * 1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A warning that is a whole sentence wraps; its heading stays in one piece. */
+.tvx-status .tvx-status-chip-long {
+  white-space: normal;
+}
+
+.tvx-status-chip-long .display-badge-icon,
+.tvx-status-chip-long .display-badge-label {
+  flex: none;
+  white-space: nowrap;
+}
+
+.tvx-status-chip-long .display-badge-detail {
+  min-width: 0;
+}
+
+/* The next-event panel. */
+.tvx-next {
+  display: var(--tvx-next-display);
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--tvx-next-pad);
+  border: var(--tvx-hairline) solid var(--line);
+  border-radius: var(--tvx-radius);
+  background-color: var(--surface);
+  text-align: left;
+  /* Turning brass is a slow change of colour, never a flash. */
+  transition:
+    background-color 1.2s ease,
+    border-color 1.2s ease,
+    color 1.2s ease;
+}
+
+.tvx-next .tvx-next-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--tvx-next-label-size);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.tvx-next-what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tvx-next .tvx-next-at {
+  flex: none;
+  margin-left: calc(var(--tv-u) * 2);
+  color: var(--fg-muted);
+  transition: color 1.2s ease;
+}
+
+.tvx-next .tvx-next-count {
+  display: block;
+  margin-top: var(--tvx-next-count-space);
+  margin-left: calc(var(--tv-u) * -0.3);
+  color: var(--accent-fg);
+  font-size: var(--tvx-next-count-size);
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  transition: color 1.2s ease;
+}
+
+.tvx-next.tvx-next-urgent {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.tvx-next-urgent .tvx-next-at,
+.tvx-next-urgent .tvx-next-count {
+  color: var(--on-accent);
+}
+
+/* ==========================================================================
+   4. Timetable
+   ========================================================================== */
+
+.tvx-table {
+  grid-area: table;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  --tvx-table-columns: minmax(0, 1fr) var(--tvx-time-column) var(--tvx-time-column);
+  --tvx-time-scale: 1;
+}
+
+/* Twenty-four-hour times are a digit wider: a touch smaller keeps the two columns apart. */
+.tvx-table.tvx-table-24h {
+  --tvx-time-scale: 0.93;
+}
+
+/* Only one of Begins and Jamaat is published: the remaining column takes the room of two. */
+.tvx-table.tvx-table-narrow {
+  --tvx-table-columns: minmax(0, 1fr) calc(var(--tvx-time-column) * 1.4);
+}
+
+.tvx-table-head {
+  display: grid;
+  flex: none;
+  grid-template-columns: var(--tvx-table-columns);
+  align-items: center;
+  height: var(--tvx-head-height);
+  padding: 0 var(--tvx-pad);
+  border-radius: var(--tvx-radius);
+  color: var(--fg-muted);
+  font-size: var(--tv-text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.tvx-table-day {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.tvx-table-column {
+  text-align: right;
+}
+
+.tvx-table-note {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent-fg);
+  text-overflow: ellipsis;
+}
+
+/* Tomorrow's times: a brass heading nobody can take for today's. */
+.tvx-table-tomorrow .tvx-table-head {
+  background-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.tvx-table-head .tvx-table-day-name {
+  margin-right: calc(var(--tv-u) * 1.4);
+  font-size: var(--tv-text-md);
+}
+
+.tvx-table-day-date {
+  margin-right: calc(var(--tv-u) * 2);
+}
+
+.tvx-table-tomorrow .tvx-table-note {
+  color: inherit;
+}
+
+.tvx-rows {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: var(--tvx-rows-space);
+}
+
+.tvx-row {
+  position: relative;
+  display: grid;
+  flex: 1 1 0%;
+  grid-template-columns: var(--tvx-table-columns);
+  align-items: center;
+  min-height: 0;
+  padding: 0 var(--tvx-pad);
+  border: var(--tvx-hairline) solid transparent;
+  border-top-color: var(--line);
+  transition:
+    background-color 1.2s ease,
+    color 1.2s ease;
+}
+
+/* Sunrise is not a prayer: a shorter, quieter row. */
+.tvx-row.tvx-row-minor {
+  flex-grow: 0.6;
+}
+
+/* A Friday with several Jumu'ah times needs a little more height for them. */
+.tvx-row.tvx-row-tall {
+  flex-grow: 1.25;
+}
+
+.tvx-row-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.tvx-row-name .tvx-prayer {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--tvx-prayer-size);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+}
+
+.tvx-prayer .tvx-prayer-arabic {
+  margin-left: 0.3em;
+  color: var(--fg-muted);
+  font-size: 0.84em;
+  transition: color 1.2s ease;
+}
+
+.tvx-row-minor .tvx-prayer {
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+  font-size: var(--tv-text-md);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.tvx-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.tvx-cell .tvx-time {
+  font-size: calc(var(--tvx-time-size) * var(--tvx-time-scale));
+  transition: color 1.2s ease;
+}
+
+.tvx-row-minor .tvx-time {
+  color: var(--fg-muted);
+  font-size: calc(var(--tvx-time-size) * var(--tvx-time-scale) * 0.68);
+}
+
+/*
+ * AM/PM is left out of the table: twelve small markers would crowd the
+ * digits, and the name of the prayer already says which half of the day it
+ * is. It stays in the markup for screen readers.
+ */
+.tvx-table .display-time .display-time-period {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* Several Jumu'ah times in one cell: stacked, or two by two from three up. */
+.tvx-slots {
+  display: grid;
+  grid-template-columns: auto;
+  grid-row-gap: calc(var(--tv-u) * 0.5);
+  justify-items: end;
+}
+
+.tvx-slots.tvx-slots-grid {
+  grid-template-columns: auto auto;
+  grid-column-gap: calc(var(--tv-u) * 2);
+}
+
+.tvx-slot .tvx-slot-time {
+  font-size: var(--tvx-slot-size);
+  transition: color 1.2s ease;
+}
+
+.tvx-slots-grid .tvx-slot-time {
+  font-size: var(--tvx-slot-grid-size);
+}
+
+/*
+ * "Now" and "Next". Beside the name in landscape. In portrait, where the name
+ * column has no room for it, it sits on the top edge of its row like the
+ * legend of a frame; its fill hides the edge behind it.
+ */
+.tvx-tag {
+  position: var(--tvx-tag-position);
+  top: 0;
+  left: var(--tvx-pad);
+  flex: none;
+  margin: var(--tvx-tag-space);
+  background-color: var(--surface);
+  transform: var(--tvx-tag-shift);
+  padding: calc(var(--tv-u) * 0.35) calc(var(--tv-u) * 1.1);
+  border: var(--tvx-hairline) solid var(--accent-line);
+  border-radius: calc(var(--tv-u) * 0.7);
+  color: var(--accent-fg);
+  font-size: calc(var(--tv-u) * 2);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+/* The time the countdown is heading for. */
+.tvx-row .tvx-time-target {
+  color: var(--accent-fg);
+}
+
+/* Passed: dimmed, still well within contrast for reading from the back row. */
+.tvx-row-passed,
+.tvx-row-passed .tvx-prayer-arabic {
+  color: var(--fg-subtle);
+}
+
+/* Next: outlined. */
+.tvx-row.tvx-row-next {
+  border-color: var(--accent-line);
+  border-radius: var(--tvx-radius);
+  background-color: var(--surface);
+}
+
+/* Current: the filled row, with a brass bar on its leading edge. */
+.tvx-row.tvx-row-current {
+  border-color: var(--brand);
+  border-radius: var(--tvx-radius);
+  background-color: var(--brand);
+  color: var(--on-brand);
+}
+
+.tvx-row-current::before {
+  content: "";
+  position: absolute;
+  top: 18%;
+  left: calc(var(--tv-u) * 1);
+  width: calc(var(--tv-u) * 0.6);
+  height: 64%;
+  border-radius: calc(var(--tv-u) * 0.3);
+  background-color: var(--accent);
+}
+
+.tvx-row-current .tvx-prayer-arabic,
+.tvx-row-current .tvx-time-target {
+  color: var(--on-brand-accent);
+}
+
+.tvx-row-current .tvx-tag {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  color: var(--on-accent);
+}
+
+/* A filled or outlined row has its own edge: the hairline of the row after it goes. */
+.tvx-row-current + .tvx-row,
+.tvx-row-next + .tvx-row {
+  border-top-color: transparent;
+}
+
+.tvx-row-current + .tvx-row-next {
+  border-top-color: var(--accent-line);
+}
+
+/* No prayer times for today. */
+.tvx-nodata {
+  justify-content: center;
+  padding: calc(var(--tv-u) * 5);
+  border: var(--tvx-hairline) solid var(--line);
+  border-radius: var(--tvx-radius);
+  background-color: var(--surface);
+}
+
+.tvx-nodata .tvx-nodata-title {
+  font-size: var(--tvx-nodata-title-size);
+  line-height: 1.12;
+}
+
+.tvx-nodata-text {
+  margin-top: calc(var(--tv-u) * 2.5);
+  color: var(--fg-muted);
+  font-size: calc(var(--tv-u) * 3.2);
+  line-height: 1.35;
+}
+
+.tvx-nodata-staff {
+  margin-top: calc(var(--tv-u) * 5);
+  padding-top: calc(var(--tv-u) * 2.5);
+  border-top: var(--tvx-hairline) solid var(--line);
+  color: var(--fg-muted);
+  font-size: var(--tv-text-sm);
+  line-height: 1.4;
+}
+
+.tvx-nodata-staff .tvx-nodata-staff-label {
+  display: block;
+  margin-bottom: calc(var(--tv-u) * 0.5);
+  color: var(--accent-fg);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   5. Footer band
+   ========================================================================== */
+
+.tvx-band {
+  position: relative;
+  grid-area: band;
+  height: var(--tvx-band-height);
+  margin-top: calc(var(--tv-u) * 3);
+  overflow: hidden;
+  border: var(--tvx-hairline) solid var(--line);
+  border-radius: var(--tvx-radius);
+  background-color: var(--surface);
+}
+
+/* Messages lie on top of each other, so one can fade out under the next. */
+.tvx-band-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: var(--tvx-band-direction);
+  align-items: var(--tvx-band-align);
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--tvx-pad);
+}
+
+.tvx-band-label {
+  flex: none;
+  margin: var(--tvx-band-label-space);
+  color: var(--accent-fg);
+  font-size: var(--tv-text-sm);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.tvx-band-text {
+  min-width: 0;
+  overflow: hidden;
+  /* Clamped to the lines that fit; the rest ends in an ellipsis. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--tvx-band-lines-regular);
+  font-size: var(--tv-text-md);
+  line-height: 1.3;
+}
+
+.tvx-band-item .tvx-band-text {
+  flex: var(--tvx-band-text-flex);
+}
+
+.tvx-band-text.tvx-band-text-compact {
+  -webkit-line-clamp: var(--tvx-band-lines-compact);
+  font-size: calc(var(--tv-u) * 2.4);
+  line-height: 1.28;
+}
+
+.tvx-band-text .tvx-band-title {
+  margin-right: 0.45em;
+}
+
+.tvx-band-text .tvx-band-time {
+  color: var(--accent-fg);
+  font-size: 1.12em;
+}
+
+/* The tagline: no heading, centred, in the display face. */
+.tvx-band-tagline {
+  align-items: center;
+}
+
+.tvx-band-tagline .tvx-band-text {
+  flex: none;
+  max-width: 100%;
+  color: var(--fg-muted);
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Position marks: which message of how many. */
+.tvx-band-marks {
+  /* Beside the text in landscape; in the top corner in portrait, where the text has the full width. */
+  position: var(--tvx-band-marks-position);
+  top: calc(var(--tv-u) * 2.3);
+  right: var(--tvx-pad);
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: calc(var(--tv-u) * 2.4);
+}
+
+.tvx-band-mark {
+  width: calc(var(--tv-u) * 0.8);
+  height: calc(var(--tv-u) * 0.8);
+  margin-left: calc(var(--tv-u) * 0.7);
+  border-radius: 50%;
+  background-color: var(--line-strong);
+}
+
+.tvx-band-mark.tvx-band-mark-on {
+  background-color: var(--accent);
+}
+
+/*
+ * The cross-fade: the outgoing message is most of the way out before the
+ * incoming one comes up, so two lines of text are never legible at once.
+ */
+.tvx-band-in {
+  animation: tvx-fade-in 1s ease 0.5s both;
+}
+
+.tvx-band-out {
+  animation: tvx-fade-out 0.8s ease both;
+}
+
+@keyframes tvx-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tvx-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   6. Jamaat in progress
+   ========================================================================== */
+
+.tvx-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--tvx-margin);
+  background-color: var(--canvas);
+  color: var(--fg);
+  text-align: center;
+  /* Hidden: faded out first, then taken out of the page. */
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 1.5s ease,
+    visibility 0s linear 1.5s;
+}
+
+.tvx-overlay.tvx-overlay-on {
+  visibility: visible;
+  opacity: 1;
+  transition:
+    opacity 1.5s ease,
+    visibility 0s linear 0s;
+}
+
+.tvx-overlay .tvx-overlay-clock {
+  position: absolute;
+  top: var(--tvx-margin);
+  right: var(--tvx-margin);
+  color: var(--fg-muted);
+  font-size: calc(var(--tv-u) * 6);
+}
+
+.tvx-overlay-eyebrow {
+  color: var(--accent-fg);
+  font-size: calc(var(--tv-u) * 3.6);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.tvx-overlay-body .tvx-overlay-name {
+  display: block;
+  margin-top: calc(var(--tv-u) * 2);
+  font-size: calc(var(--tv-u) * 15);
+  line-height: 1.05;
+}
+
+.tvx-overlay-name .tvx-overlay-arabic {
+  margin-top: calc(var(--tv-u) * 1);
+  color: var(--accent-fg);
+  font-size: 0.58em;
+  line-height: 1.3;
+}
+
+.tvx-overlay-body .tvx-overlay-ask {
+  margin-top: calc(var(--tv-u) * 5);
+  padding-top: calc(var(--tv-u) * 4);
+  border-top: var(--tvx-hairline) solid var(--line);
+  font-size: calc(var(--tv-u) * 4.6);
+  line-height: 1.2;
+}
+
+/* ==========================================================================
+   7. Hint, loading placeholder, error screen
+   ========================================================================== */
+
+/* Shown only while somebody is moving the pointer. */
+.tvx-hint {
+  position: absolute;
+  bottom: var(--tvx-margin);
+  left: 50%;
+  z-index: 3;
+  padding: calc(var(--tv-u) * 0.8) calc(var(--tv-u) * 2);
+  border: var(--tvx-hairline) solid var(--line-strong);
+  border-radius: var(--tvx-radius);
+  background-color: var(--surface-raised);
+  color: var(--fg);
+  font-size: var(--tv-text-sm);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* Placeholder blocks of the loading screen. */
+.tvx-skel {
+  display: block;
+  border-radius: calc(var(--tv-u) * 0.8);
+  background-color: var(--surface-raised);
+  animation: tvx-skel 2.4s ease-in-out infinite;
+}
+
+@keyframes tvx-skel {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.tvx-skel-name {
+  width: calc(var(--tv-u) * 30);
+  height: calc(var(--tv-u) * 4);
+}
+
+/* The blocks below take the height of the lines they stand in for. */
+.tvx-skel-clock {
+  width: calc(var(--tvx-clock-size) * 2.6);
+  height: calc(var(--tvx-clock-size) * 0.9);
+}
+
+.tvx-skel-date {
+  width: calc(var(--tv-u) * 44);
+  height: calc(var(--tvx-date-size) * 1.15);
+  margin-top: calc(var(--tv-u) * 1.8);
+}
+
+.tvx-skel-hijri {
+  width: calc(var(--tv-u) * 30);
+  height: calc(var(--tvx-hijri-size) * 1.2);
+  margin-top: calc(var(--tv-u) * 0.7);
+}
+
+.tvx-skel-cell-name {
+  width: calc(var(--tv-u) * 22);
+  height: calc(var(--tvx-prayer-size) * 0.8);
+}
+
+.tvx-skel-cell-time {
+  justify-self: end;
+  width: calc(var(--tv-u) * 14);
+  height: calc(var(--tvx-time-size) * 0.7);
+}
+
+.tvx-row-minor .tvx-skel {
+  height: calc(var(--tv-u) * 2.6);
+  opacity: 0.6;
+}
+
+/* "Reconnecting": the error screen. */
+.tvx-notice {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--tvx-margin);
+  text-align: center;
+}
+
+.tvx-notice-mark {
+  font-size: calc(var(--tv-u) * 12);
+}
+
+.tvx-notice .tvx-notice-title {
+  margin-top: calc(var(--tv-u) * 4);
+  font-size: var(--tv-text-2xl);
+  line-height: 1.1;
+}
+
+.tvx-notice-text {
+  max-width: calc(var(--tv-u) * 70);
+  margin-top: calc(var(--tv-u) * 2);
+  color: var(--fg-muted);
+  font-size: calc(var(--tv-u) * 3.2);
+  line-height: 1.35;
+}
