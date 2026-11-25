@@ -1,1 +1,1103 @@
 @import "tailwindcss";
+
+/*
+ * Uwais design system.
+ *
+ * Concept: the prayer hall at night and the courtyard by day. Deep green-black
+ * surfaces lit by brass in the dark themes, pale limestone with green ink in
+ * the light themes. One ornament (the eight-fold lattice), one serif that
+ * speaks the names and the times, one quiet sans that does the work.
+ *
+ * How this file is organised
+ *   1. Design tokens            plain custom properties, one block per theme
+ *   2. Tailwind theme mapping   exposes the tokens as utilities (bg-surface, ...)
+ *   3. Variants
+ *   4. Base styles
+ *   5. Site utilities           numerals, time numerals, motion helpers, brand classes
+ *   6. TV foundations           plain CSS, deliberately outside every @layer
+ *   7. Reduced motion
+ *   8. Print
+ *
+ * Sections 1 and 6 must stay OUTSIDE cascade layers and must only use CSS that
+ * old Chromium understands. Smart TVs and signage boxes run Chromium 80-98,
+ * which drops every `@layer` block (so no Tailwind utility reaches them) and
+ * lacks `inset`, `:where()`, `color-mix()`, `aspect-ratio` and flexbox `gap`.
+ */
+
+/* ==========================================================================
+   1. Design tokens
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces: page, card, popover/dialog, wells and zebra stripes. */
+  --canvas: #f2f4ef;
+  --surface: #fbfcf9;
+  --surface-raised: #ffffff;
+  --surface-sunken: #e7ebe3;
+
+  /* Text. All three pass WCAG AA on every surface above. */
+  --fg: #12231f;
+  --fg-muted: #43534c;
+  --fg-subtle: #5a6962;
+
+  /* Hairlines, and control outlines that need 3:1 against the surface. */
+  --line: #d5dbd0;
+  --line-strong: #7f8d85;
+
+  /* Brand: the green ink. */
+  --brand: #15493f;
+  --brand-hover: #0f3a32;
+  --on-brand: #f4f7f1;
+  /* Brass that reads on the brand fill; plain --accent is too dark there for small text. */
+  --on-brand-accent: #e6bf73;
+  --brand-fg: #15493f;
+  --brand-soft: #dcebe4;
+  --brand-line: #a9cbbd;
+
+  /* Accent: brass. `--accent` is a fill, `--accent-fg` is brass you can read. */
+  --accent: #b98a2f;
+  --accent-hover: #a67a25;
+  --on-accent: #1a1305;
+  --accent-fg: #7a5710;
+  --accent-soft: #f4ead3;
+  --accent-line: #dcc48d;
+
+  /* Colour of the logo mark: green ink on light themes, lamp-lit cream on dark ones. */
+  --mark: #15493f;
+
+  /* The main call to action. Green by day, brass by lamplight. */
+  --primary: var(--brand);
+  --primary-hover: var(--brand-hover);
+  --on-primary: var(--on-brand);
+
+  /* Status colours: fill, text on that fill, readable text, tint, tint border. */
+  --success: #1d7449;
+  --on-success: #ffffff;
+  --success-fg: #185f3c;
+  --success-soft: #dff0e5;
+  --success-line: #9ccbae;
+
+  --warning: #c77700;
+  --on-warning: #1a1305;
+  --warning-fg: #854900;
+  --warning-soft: #fbecd2;
+  --warning-line: #e5c48a;
+
+  --danger: #b3261e;
+  --danger-hover: #931b15;
+  --on-danger: #ffffff;
+  --danger-fg: #9c1f18;
+  --danger-soft: #fbe5e2;
+  --danger-line: #e7aba5;
+
+  --info: #1f5f8b;
+  --on-info: #ffffff;
+  --info-fg: #1b5279;
+  --info-soft: #e1edf5;
+  --info-line: #a6c6dc;
+
+  /* Focus ring: brass you can see on every surface of the theme. */
+  --ring: #8a6417;
+
+  /* Shadows are tinted with the ink colour, never neutral grey. */
+  --shadow-color: rgba(11, 38, 33, 0.1);
+  --shadow-color-strong: rgba(11, 38, 33, 0.2);
+  --scrim: rgba(7, 26, 23, 0.55);
+
+  /* Light text on dark blooms unless it is antialiased; dark on light does not need it. */
+  --font-smoothing: auto;
+
+  /* Type. The --font-* loader variables come from src/fonts (next/font). The
+     Latin Extended files go first: they only claim their own unicode-range,
+     and must be consulted before the metric-adjusted system fallback. */
+  --stack-sans:
+    var(--font-source-sans-ext), var(--font-source-sans), "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial,
+    sans-serif;
+  --stack-display:
+    var(--font-literata-ext), var(--font-literata), "Literata", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --stack-arabic: var(--font-reem-kufi), var(--stack-sans);
+  --font-sans: var(--stack-sans);
+  --font-display: var(--stack-display);
+  --font-arabic: var(--stack-arabic);
+
+  /* Motion. */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 360ms;
+
+  /* Smallest comfortable touch target (WCAG 2.5.5). */
+  --control: 2.75rem;
+
+  /*
+   * TV unit. The TV page is designed on a 160 x 90 grid (90 x 160 in
+   * portrait); one unit is whichever of width/160 and height/90 is smaller,
+   * so the same layout fills 720p, 1080p and 4K without media queries.
+   * 1u = 8px at 720p, 12px at 1080p, 24px at 4K.
+   */
+  --tv-u: clamp(4px, min(0.625vw, 1.1111vh), 48px);
+}
+
+@media (orientation: portrait) {
+  :root {
+    --tv-u: clamp(4px, min(1.1111vw, 0.625vh), 48px);
+  }
+}
+
+/*
+ * Dark theme. The same block appears twice because CSS cannot share
+ * declarations between a media query and an attribute selector: once for
+ * "follow the system" and once for the explicit override. Keep them identical
+ * (a test compares them). The media query is limited to screens so that a
+ * page printed from a dark-mode device still gets the print tokens.
+ */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --canvas: #0a1614;
+    --surface: #10211d;
+    --surface-raised: #172d28;
+    --surface-sunken: #07110f;
+
+    --fg: #e9efe8;
+    --fg-muted: #a9bab1;
+    --fg-subtle: #8b9e95;
+
+    --line: #223a34;
+    --line-strong: #5f796f;
+
+    --brand: #1a5a4d;
+    --brand-hover: #206c5c;
+    --on-brand: #f1f5ee;
+    --on-brand-accent: #ecc67d;
+    --brand-fg: #8fd1be;
+    --brand-soft: #143a32;
+    --brand-line: #2a6557;
+
+    --accent: #e2b866;
+    --accent-hover: #ecc77f;
+    --on-accent: #1a1305;
+    --accent-fg: #e7c27a;
+    --accent-soft: #3a2e14;
+    --accent-line: #6e5723;
+
+    --mark: #e9efe8;
+
+    --primary: var(--accent);
+    --primary-hover: var(--accent-hover);
+    --on-primary: var(--on-accent);
+
+    --success: #3fa873;
+    --on-success: #04130c;
+    --success-fg: #7fd3a4;
+    --success-soft: #12301f;
+    --success-line: #23593c;
+
+    --warning: #e5a23a;
+    --on-warning: #1a1305;
+    --warning-fg: #f0bc6a;
+    --warning-soft: #382911;
+    --warning-line: #6b4f1d;
+
+    --danger: #c83c33;
+    --danger-hover: #b4322a;
+    --on-danger: #ffffff;
+    --danger-fg: #ff9a91;
+    --danger-soft: #3b1614;
+    --danger-line: #73302b;
+
+    --info: #4c9bd1;
+    --on-info: #04121c;
+    --info-fg: #8ec5ec;
+    --info-soft: #11293a;
+    --info-line: #24506e;
+
+    --ring: #e2b866;
+
+    --shadow-color: rgba(0, 0, 0, 0.35);
+    --shadow-color-strong: rgba(0, 0, 0, 0.55);
+    --scrim: rgba(2, 8, 7, 0.7);
+
+    --font-smoothing: antialiased;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #0a1614;
+  --surface: #10211d;
+  --surface-raised: #172d28;
+  --surface-sunken: #07110f;
+
+  --fg: #e9efe8;
+  --fg-muted: #a9bab1;
+  --fg-subtle: #8b9e95;
+
+  --line: #223a34;
+  --line-strong: #5f796f;
+
+  --brand: #1a5a4d;
+  --brand-hover: #206c5c;
+  --on-brand: #f1f5ee;
+  --on-brand-accent: #ecc67d;
+  --brand-fg: #8fd1be;
+  --brand-soft: #143a32;
+  --brand-line: #2a6557;
+
+  --accent: #e2b866;
+  --accent-hover: #ecc77f;
+  --on-accent: #1a1305;
+  --accent-fg: #e7c27a;
+  --accent-soft: #3a2e14;
+  --accent-line: #6e5723;
+
+  --mark: #e9efe8;
+
+  --primary: var(--accent);
+  --primary-hover: var(--accent-hover);
+  --on-primary: var(--on-accent);
+
+  --success: #3fa873;
+  --on-success: #04130c;
+  --success-fg: #7fd3a4;
+  --success-soft: #12301f;
+  --success-line: #23593c;
+
+  --warning: #e5a23a;
+  --on-warning: #1a1305;
+  --warning-fg: #f0bc6a;
+  --warning-soft: #382911;
+  --warning-line: #6b4f1d;
+
+  --danger: #c83c33;
+  --danger-hover: #b4322a;
+  --on-danger: #ffffff;
+  --danger-fg: #ff9a91;
+  --danger-soft: #3b1614;
+  --danger-line: #73302b;
+
+  --info: #4c9bd1;
+  --on-info: #04121c;
+  --info-fg: #8ec5ec;
+  --info-soft: #11293a;
+  --info-line: #24506e;
+
+  --ring: #e2b866;
+
+  --shadow-color: rgba(0, 0, 0, 0.35);
+  --shadow-color-strong: rgba(0, 0, 0, 0.55);
+  --scrim: rgba(2, 8, 7, 0.7);
+
+  --font-smoothing: antialiased;
+}
+
+/*
+ * TV themes. Scoped to an element (the TV page root) instead of <html>, so
+ * the TV keeps the theme chosen in the admin settings whatever the box's own
+ * colour-scheme preference is. Tuned for a wall screen read from 3 to 12 m:
+ * every text colour is 7:1 or better, and neither theme uses pure white or
+ * pure black, which glare and burn in on panels that show one page all day.
+ */
+[data-tv-theme="night"] {
+  color-scheme: dark;
+
+  --canvas: #06110f;
+  --surface: #0c1e1a;
+  --surface-raised: #12302a;
+  --surface-sunken: #040c0a;
+
+  --fg: #f1ede0;
+  --fg-muted: #c5d0c8;
+  --fg-subtle: #aebdb4;
+
+  --line: #2b4a42;
+  --line-strong: #62827a;
+
+  --brand: #165042;
+  --brand-hover: #165042;
+  --on-brand: #f6f3e8;
+  --on-brand-accent: #f9dfa9;
+  --brand-fg: #9ad9c7;
+  --brand-soft: #123a32;
+  --brand-line: #2f6c5d;
+
+  --accent: #f0c36b;
+  --accent-hover: #f0c36b;
+  --on-accent: #171003;
+  --accent-fg: #f3cc7e;
+  --accent-soft: #3d3013;
+  --accent-line: #7a6026;
+
+  --mark: #f1ede0;
+
+  --primary: var(--accent);
+  --primary-hover: var(--accent-hover);
+  --on-primary: var(--on-accent);
+
+  --success: #4cb681;
+  --on-success: #04130c;
+  --success-fg: #8fdcb0;
+  --success-soft: #12301f;
+  --success-line: #23593c;
+
+  --warning: #eeac45;
+  --on-warning: #171003;
+  --warning-fg: #f5c577;
+  --warning-soft: #382911;
+  --warning-line: #6b4f1d;
+
+  --danger: #f0958c;
+  --danger-hover: #f0958c;
+  --on-danger: #2a0806;
+  --danger-fg: #ffaaa2;
+  --danger-soft: #3b1614;
+  --danger-line: #73302b;
+
+  --info: #5aa7db;
+  --on-info: #04121c;
+  --info-fg: #9dcff1;
+  --info-soft: #11293a;
+  --info-line: #24506e;
+
+  --ring: #f0c36b;
+
+  --shadow-color: rgba(0, 0, 0, 0.4);
+  --shadow-color-strong: rgba(0, 0, 0, 0.6);
+  --scrim: rgba(2, 8, 7, 0.8);
+
+  --font-smoothing: antialiased;
+}
+
+[data-tv-theme="day"] {
+  color-scheme: light;
+
+  --canvas: #edf0e7;
+  --surface: #f7f8f2;
+  --surface-raised: #fcfcf8;
+  --surface-sunken: #dfe4d8;
+
+  --fg: #08201b;
+  --fg-muted: #263a33;
+  --fg-subtle: #364841;
+
+  --line: #b7c2b4;
+  --line-strong: #647a6f;
+
+  --brand: #0f4037;
+  --brand-hover: #0f4037;
+  --on-brand: #f6f3e8;
+  --on-brand-accent: #edc980;
+  --brand-fg: #0f4037;
+  --brand-soft: #d2e4db;
+  --brand-line: #8fb7a7;
+
+  --accent: #c99832;
+  --accent-hover: #c99832;
+  --on-accent: #171003;
+  --accent-fg: #5f4106;
+  --accent-soft: #efe2c1;
+  --accent-line: #cfb373;
+
+  --mark: #0f4037;
+
+  --primary: var(--brand);
+  --primary-hover: var(--brand-hover);
+  --on-primary: var(--on-brand);
+
+  --success: #15603b;
+  --on-success: #fcfcf8;
+  --success-fg: #114d2f;
+  --success-soft: #d6ebdd;
+  --success-line: #8fc3a3;
+
+  --warning: #dc9424;
+  --on-warning: #171003;
+  --warning-fg: #6b3a00;
+  --warning-soft: #f7e6c6;
+  --warning-line: #dfbb7a;
+
+  --danger: #a32019;
+  --danger-hover: #a32019;
+  --on-danger: #fcfcf8;
+  --danger-fg: #7f1711;
+  --danger-soft: #f6dcd8;
+  --danger-line: #e0a099;
+
+  --info: #1b5279;
+  --on-info: #fcfcf8;
+  --info-fg: #133f5e;
+  --info-soft: #d9e8f2;
+  --info-line: #9bbfd8;
+
+  --ring: #5f4106;
+
+  --shadow-color: rgba(11, 38, 33, 0.12);
+  --shadow-color-strong: rgba(11, 38, 33, 0.22);
+  --scrim: rgba(7, 26, 23, 0.55);
+
+  --font-smoothing: auto;
+}
+
+/* ==========================================================================
+   2. Tailwind theme mapping
+   ========================================================================== */
+
+/*
+ * `inline` makes utilities reference the token itself (bg-surface compiles to
+ * `background-color: var(--surface)`), so they re-resolve inside a nested
+ * theme scope such as [data-tv-theme]. The default Tailwind palette is
+ * removed on purpose: there is no bg-emerald-600 to reach for.
+ */
+@theme inline {
+  --color-*: initial;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-on-brand: var(--on-brand);
+  --color-on-brand-accent: var(--on-brand-accent);
+  --color-brand-fg: var(--brand-fg);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-line: var(--brand-line);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+
+  --color-success: var(--success);
+  --color-on-success: var(--on-success);
+  --color-success-fg: var(--success-fg);
+  --color-success-soft: var(--success-soft);
+  --color-success-line: var(--success-line);
+
+  --color-warning: var(--warning);
+  --color-on-warning: var(--on-warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-line: var(--warning-line);
+
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-on-danger: var(--on-danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+
+  --color-info: var(--info);
+  --color-on-info: var(--on-info);
+  --color-info-fg: var(--info-fg);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+
+  --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
+
+  --font-sans: var(--stack-sans);
+  --font-display: var(--stack-display);
+  --font-arabic: var(--stack-arabic);
+
+  --shadow-*: initial;
+  --shadow-xs: 0 1px 1px var(--shadow-color);
+  --shadow-sm: 0 1px 2px var(--shadow-color), 0 2px 6px -2px var(--shadow-color);
+  --shadow-md: 0 2px 4px -1px var(--shadow-color), 0 10px 24px -8px var(--shadow-color-strong);
+  --shadow-lg: 0 4px 10px -2px var(--shadow-color), 0 28px 56px -16px var(--shadow-color-strong);
+
+  --spacing-control: var(--control);
+
+  --default-transition-duration: var(--duration-base);
+}
+
+@theme {
+  /*
+   * Type scale. Body copy is 17px because a large share of the readers are
+   * older; nothing in the product goes below 13px. Sizes from 3xl up are
+   * fluid so a heading that fits a phone also carries a desktop page.
+   */
+  --text-*: initial;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.4;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.45;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.55;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.35;
+  --text-2xl: 1.625rem;
+  --text-2xl--line-height: 1.25;
+  --text-3xl: clamp(1.875rem, 1.6rem + 1.2vw, 2.25rem);
+  --text-3xl--line-height: 1.15;
+  --text-4xl: clamp(2.25rem, 1.8rem + 2vw, 3rem);
+  --text-4xl--line-height: 1.1;
+  --text-5xl: clamp(2.75rem, 2rem + 3.4vw, 4rem);
+  --text-5xl--line-height: 1.05;
+  --text-6xl: clamp(3.25rem, 2.1rem + 5.2vw, 5.5rem);
+  --text-6xl--line-height: 1;
+
+  /* Sizes for time numerals: timetable cell, today's row, next-prayer card, hero clock. */
+  --text-time-sm: 1.0625rem;
+  --text-time-sm--line-height: 1.2;
+  --text-time: 1.5rem;
+  --text-time--line-height: 1.1;
+  --text-time-lg: clamp(2.25rem, 1.7rem + 2.6vw, 3.25rem);
+  --text-time-lg--line-height: 1;
+  --text-time-xl: clamp(3.5rem, 2rem + 8vw, 7.5rem);
+  --text-time-xl--line-height: 0.95;
+
+  /* Radii grow with the size of the thing: check box, badge, control, card, dialog. */
+  --radius-*: initial;
+  --radius-xs: 0.1875rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+
+  /* Layout rhythm. */
+  --spacing-gutter: clamp(1rem, 4vw, 2.5rem);
+  --spacing-section: clamp(2.5rem, 6vw, 5rem);
+  --spacing-stack: 1.5rem;
+
+  --container-prose: 40rem;
+  --container-form: 34rem;
+  --container-page: 72rem;
+
+  /* Motion. */
+  --ease-*: initial;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+
+  --animate-fade-in: fade-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-rise-in: rise-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-dialog-in: dialog-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-skeleton: skeleton 1.6s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+  }
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem) scale(0.98);
+    }
+  }
+
+  @keyframes skeleton {
+    50% {
+      opacity: 0.45;
+    }
+  }
+}
+
+/* ==========================================================================
+   3. Variants
+   ========================================================================== */
+
+/*
+ * `dark:` follows the same switch as the tokens. Components should not need
+ * it: use the semantic colours and they adapt on their own. It exists for the
+ * rare asset that has to be swapped.
+ */
+@custom-variant dark {
+  @media screen and (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+
+  @media screen {
+    &:where([data-theme="dark"], [data-theme="dark"] *) {
+      @slot;
+    }
+  }
+}
+
+/* ==========================================================================
+   4. Base styles
+   ========================================================================== */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* A modal dialog should not let the page scroll underneath it. */
+  html:has(dialog[open]) {
+    overflow: hidden;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: var(--canvas);
+    color: var(--fg);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: var(--font-smoothing);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 650;
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--fg);
+  }
+
+  ::placeholder {
+    color: var(--fg-subtle);
+    opacity: 1;
+  }
+
+  /* One focus treatment everywhere: a brass ring that clears the element. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Preflight makes buttons use the default cursor; this product wants the hand. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
+/* ==========================================================================
+   5. Site utilities and brand classes
+   ========================================================================== */
+
+/* Figures that line up in a column: lining and tabular. */
+@utility numerals {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/*
+ * A time of day. Always the display serif, always tabular, so 5:07 and 11:48
+ * occupy the same width and a ticking clock never shifts. Pair it with a
+ * `text-time*` size.
+ */
+@utility time-numerals {
+  font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+
+@utility duration-fast {
+  transition-duration: var(--duration-fast);
+}
+
+@utility duration-base {
+  transition-duration: var(--duration-base);
+}
+
+@utility duration-slow {
+  transition-duration: var(--duration-slow);
+}
+
+/* Colours that should survive "economy" printing, e.g. a highlighted row. */
+@utility print-exact {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/*
+ * TV reset: the stand-in for Preflight inside `.tv-stage`, where cascade
+ * layers may be unsupported. It has the specificity of a single class, so it
+ * must come BEFORE every unlayered class in this file (and before the TV
+ * page's own stylesheet); a later one-class rule then overrides it. It also
+ * means Tailwind margin, font-size and font-weight utilities have no effect
+ * inside the stage, in any browser, which keeps old and new TVs identical.
+ */
+.tv-stage * {
+  margin: 0;
+  box-sizing: border-box;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/*
+ * Arabic text set by the <Arabic> component. Unlayered so that it also
+ * applies on the TV page in browsers without cascade layers.
+ */
+.arabic {
+  font-family: var(--font-arabic);
+  font-feature-settings: normal;
+  letter-spacing: 0;
+}
+
+/* The lattice ornament always sits behind content and never takes pointer events. */
+.lattice {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* The mark and the mosque's name. Sized in em: set the font size on .wordmark. */
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  line-height: 1.1;
+  text-decoration: none;
+}
+
+.wordmark-mark {
+  margin-right: 0.5em;
+}
+
+.wordmark-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wordmark-name {
+  font-family: var(--font-display);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.wordmark-tagline {
+  margin-top: 0.3em;
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+  font-size: 0.5em;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+/* A hairline broken by a small brass star. */
+.ornament-rule {
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.ornament-rule::before,
+.ornament-rule::after {
+  content: "";
+  flex: 1 1 0%;
+  height: 1px;
+  background-color: var(--line);
+}
+
+.ornament-rule > svg {
+  margin: 0 0.75em;
+}
+
+/* ==========================================================================
+   6. TV foundations
+   ========================================================================== */
+
+/*
+ * Everything the TV page needs to lay out type, written as plain CSS so it
+ * works without Tailwind (see the note at the top of this file). Build the
+ * TV page from these classes plus a stylesheet of its own, imported by the TV
+ * route so that it loads after this file and its rules win over the reset
+ * below. Sizes are multiples of var(--tv-u), and spacing should be too:
+ * `padding: calc(var(--tv-u) * 3)`.
+ */
+
+:root {
+  /* Keep content inside the picture on sets that overscan. */
+  --tv-safe: calc(var(--tv-u) * 4.5);
+  --tv-gap: calc(var(--tv-u) * 2);
+
+  --tv-text-xs: calc(var(--tv-u) * 1.75);
+  --tv-text-sm: calc(var(--tv-u) * 2.25);
+  --tv-text-md: calc(var(--tv-u) * 3);
+  --tv-text-lg: calc(var(--tv-u) * 4);
+  --tv-text-xl: calc(var(--tv-u) * 5.5);
+  --tv-text-2xl: calc(var(--tv-u) * 8);
+  --tv-text-clock: calc(var(--tv-u) * 17);
+}
+
+/* The full-screen root of the TV page. Put data-tv-theme on the same element. */
+.tv-stage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  background-color: var(--canvas);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--tv-text-md);
+  /* Regular weight thins out at distance; 500 is the floor on the TV. */
+  font-weight: 500;
+  line-height: 1.3;
+  -webkit-font-smoothing: var(--font-smoothing);
+  cursor: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.tv-text-xs {
+  font-size: var(--tv-text-xs);
+  line-height: 1.3;
+}
+
+.tv-text-sm {
+  font-size: var(--tv-text-sm);
+  line-height: 1.3;
+}
+
+.tv-text-md {
+  font-size: var(--tv-text-md);
+  line-height: 1.3;
+}
+
+.tv-text-lg {
+  font-size: var(--tv-text-lg);
+  line-height: 1.15;
+}
+
+.tv-text-xl {
+  font-size: var(--tv-text-xl);
+  line-height: 1.05;
+}
+
+.tv-text-2xl {
+  font-size: var(--tv-text-2xl);
+  line-height: 1;
+}
+
+/* Names and headings on the TV: the display serif, never lighter than 600. */
+.tv-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Any figure on the TV that sits in a column or changes while it is watched. */
+.tv-numerals {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* A prayer time in the TV timetable. */
+.tv-time {
+  font-family: var(--font-display);
+  font-size: var(--tv-text-xl);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* The wall clock: 204px tall at 1080p. */
+.tv-clock {
+  font-family: var(--font-display);
+  font-size: var(--tv-text-clock);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 0.9;
+  white-space: nowrap;
+}
+
+/* Seconds and am/pm beside the clock: smaller, lighter in colour, same face. */
+.tv-clock-minor {
+  font-size: 0.42em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/*
+ * Burn-in guard. Shifts its element by a few pixels over eight minutes so no
+ * edge rests on the same pixels all day. Too slow to perceive as movement.
+ */
+.tv-drift {
+  animation: tv-drift 480s ease-in-out infinite alternate;
+}
+
+@keyframes tv-drift {
+  from {
+    transform: translate(calc(var(--tv-u) * -0.3), calc(var(--tv-u) * -0.2));
+  }
+
+  to {
+    transform: translate(calc(var(--tv-u) * 0.3), calc(var(--tv-u) * 0.2));
+  }
+}
+
+/* ==========================================================================
+   7. Reduced motion
+   ========================================================================== */
+
+/*
+ * Mark an element data-motion="essential" only when its animation carries
+ * information that would otherwise be lost (the spinner). The TV drift is
+ * exempt because it protects hardware and is imperceptible.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *:not([data-motion="essential"]):not(.tv-drift),
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   8. Print
+   ========================================================================== */
+
+/* The monthly timetable is printed on A4 and pinned to a noticeboard. */
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@page landscape {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  /* Whatever theme is on screen, paper is white and ink is dark. */
+  :root,
+  :root[data-theme],
+  [data-tv-theme] {
+    color-scheme: light;
+
+    --canvas: #ffffff;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-sunken: #eef1ea;
+
+    --fg: #000000;
+    --fg-muted: #2b332f;
+    --fg-subtle: #4a544f;
+
+    --line: #b9c0b6;
+    --line-strong: #6b756f;
+
+    --brand: #15493f;
+    --on-brand: #ffffff;
+    --on-brand-accent: #ecd08f;
+    --brand-fg: #0f3a32;
+    --brand-soft: #e3eee8;
+    --brand-line: #9dbfb1;
+
+    --accent: #9a7222;
+    --on-accent: #ffffff;
+    --accent-fg: #5f4106;
+    --accent-soft: #f4ecd9;
+    --accent-line: #cdb47a;
+
+    --mark: #15493f;
+
+    --primary: var(--brand);
+    --on-primary: var(--on-brand);
+
+    --shadow-color: transparent;
+    --shadow-color-strong: transparent;
+  }
+
+  html {
+    /* rem-based sizes shrink with this, which sets the density of the sheet. */
+    font-size: 10pt;
+  }
+
+  body {
+    min-height: 0;
+    background: #ffffff;
+    color: #000000;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  /* Repeat table headings on every page and never split a row across pages. */
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  img,
+  svg,
+  figure {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-landscape {
+    page: landscape;
+  }
+}

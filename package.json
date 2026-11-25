@@ -10,9 +10,16 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "icons": "tsx scripts/generate-icons.ts",
+    "samples": "tsx scripts/generate-samples.ts samples",
+    "templates": "tsx scripts/generate-samples.ts templates",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@fontsource-variable/literata": "^5.3.0",
+    "@fontsource-variable/reem-kufi": "^5.3.0",
+    "@fontsource-variable/source-sans-3": "^5.3.1",
     "@libsql/client": "^0.18.0",
     "exceljs": "^4.4.0",
     "jose": "^6.2.18",
@@ -45,5 +52,11 @@
   },
   "engines": {
     "node": ">=20.19"
-  }
+  },
+  "browserslist": [
+    "chrome >= 80",
+    "edge >= 80",
+    "firefox >= 78",
+    "safari >= 14"
+  ]
 }
