@@ -22,6 +22,7 @@ import {
   type ImportDayEffect,
   type SaveDayResult,
 } from "../types";
+import { serverNowMs } from "@/lib/server/clock";
 import { withTimetableLock } from "./lock";
 import { failure, validationFailure, type FieldLabels } from "./result";
 
@@ -58,7 +59,7 @@ function propertiesOf(input: unknown): Readonly<Record<string, unknown>> {
  * @param nowMs Clock, epoch milliseconds.
  * @throws when the database cannot be written.
  */
-export async function saveDay(input: unknown, nowMs: number = Date.now()): Promise<SaveDayResult> {
+export async function saveDay(input: unknown, nowMs: number = serverNowMs()): Promise<SaveDayResult> {
   const parsed = prayerDaySchema.safeParse(input);
   if (!parsed.success) return validationFailure(parsed.error, { labels: DAY_LABELS });
 

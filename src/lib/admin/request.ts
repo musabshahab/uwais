@@ -6,6 +6,7 @@
 import { cache } from "react";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/auth";
+import { serverNowMs } from "@/lib/server/clock";
 import { loadSettings } from "@/lib/server/data";
 import { mosqueToday } from "@/lib/server/display";
 import type { DateString } from "@/lib/types";
@@ -34,5 +35,5 @@ export async function requireAdminRequest(): Promise<void> {
 export const loadMosqueToday: () => Promise<DateString> = cache(async () => {
   await connection();
   const settings = await loadSettings();
-  return mosqueToday(settings.timezone, Date.now());
+  return mosqueToday(settings.timezone, serverNowMs());
 });

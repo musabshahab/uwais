@@ -18,6 +18,7 @@
 import { saveSettings, siteSettingsPatchSchema, siteSettingsSchema } from "@/lib/db";
 import type { JumuahSlot } from "@/lib/types";
 import type { SaveSettingsResult } from "../types";
+import { serverNowMs } from "@/lib/server/clock";
 import { isFormData, readFlag, readNumber, readText, readTrimmed } from "./form";
 import { validationFailure, type FieldLabels } from "./result";
 
@@ -133,7 +134,7 @@ function readSettingsForm(formData: FormData): SettingsForm {
  */
 export async function saveSettingsFrom(
   payload: unknown,
-  nowMs: number = Date.now(),
+  nowMs: number = serverNowMs(),
 ): Promise<SaveSettingsResult> {
   if (isFormData(payload)) {
     const form = readSettingsForm(payload);

@@ -75,6 +75,7 @@ import type {
   SiteSettings,
   TimetableCoverage,
 } from "@/lib/types";
+import { serverNowMs } from "./clock";
 import { buildDisplayPayload, mosqueToday } from "./display";
 
 /** How far ahead the admin overview looks for days without prayer times. */
@@ -86,7 +87,7 @@ export const ADMIN_LOOKAHEAD_DAYS = 60;
  */
 const requestNow = cache(async (): Promise<number> => {
   await connection();
-  return Date.now();
+  return serverNowMs();
 });
 
 /** The stored settings and whether anything has been saved yet. One read per render. */

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { TimetableSkeleton } from "@/components/site/timetable/timetable-skeleton";
 import { TimetableView } from "@/components/site/timetable/timetable-view";
+import { serverNowMs } from "@/lib/server/clock";
 import { loadMonth, loadSettings, type MonthTimetable } from "@/lib/server/data";
 import { mosqueToday } from "@/lib/server/display";
 import { timetableMetadata } from "@/lib/site/metadata";
@@ -26,7 +27,7 @@ interface TimetablePageProps {
 async function loadCurrentMonth(): Promise<MonthTimetable> {
   const settings = await loadSettings();
   await connection();
-  const month = monthOf(mosqueToday(settings.timezone, Date.now()));
+  const month = monthOf(mosqueToday(settings.timezone, serverNowMs()));
   const data = await loadMonth(month);
   if (data === null) throw new Error(`The current month "${month}" could not be loaded.`);
   return data;

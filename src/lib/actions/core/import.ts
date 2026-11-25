@@ -57,6 +57,7 @@ import {
   type ImportPreviewData,
   type ImportPreviewRow,
 } from "../types";
+import { serverNowMs } from "@/lib/server/clock";
 import { cleanFileName, isFormData, readFile, readFlag, readTrimmed } from "./form";
 import { withTimetableLock } from "./lock";
 import { failure } from "./result";
@@ -454,7 +455,7 @@ function toPreview(analysis: ImportAnalysis): ImportPreviewData {
  */
 export async function previewImport(
   request: ImportRequest,
-  nowMs: number = Date.now(),
+  nowMs: number = serverNowMs(),
 ): Promise<ImportPreview> {
   const analysed = await analyseImport(request, nowMs);
   if (!analysed.ok) return analysed;
@@ -496,7 +497,7 @@ function acknowledgementRequired(counts: ImportIssueCounts): ActionFailure {
  */
 export async function commitImport(
   request: ImportRequest,
-  nowMs: number = Date.now(),
+  nowMs: number = serverNowMs(),
 ): Promise<ImportCommitResult> {
   return withTimetableLock(async () => {
     const analysed = await analyseImport(request, nowMs);
@@ -540,7 +541,7 @@ export async function commitImport(
  */
 export async function previewImportForm(
   formData: unknown,
-  nowMs: number = Date.now(),
+  nowMs: number = serverNowMs(),
 ): Promise<ImportPreview> {
   const form = await readImportForm(formData);
   return form.ok ? previewImport(form.request, nowMs) : form;
@@ -552,7 +553,7 @@ export async function previewImportForm(
  */
 export async function commitImportForm(
   formData: unknown,
-  nowMs: number = Date.now(),
+  nowMs: number = serverNowMs(),
 ): Promise<ImportCommitResult> {
   const form = await readImportForm(formData);
   return form.ok ? commitImport(form.request, nowMs) : form;

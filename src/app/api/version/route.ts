@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import type { VersionResponse } from "@/lib/server/api-types";
+import { serverNowMs } from "@/lib/server/clock";
 import { buildVersion } from "@/lib/server/display";
 import { jsonResponse } from "@/lib/server/http";
 
@@ -12,6 +13,6 @@ import { jsonResponse } from "@/lib/server/http";
 export async function GET(): Promise<Response> {
   // Wait for a real request: the clock must be read now, not while building.
   await connection();
-  const body: VersionResponse = { version: buildVersion(), serverNow: Date.now() };
+  const body: VersionResponse = { version: buildVersion(), serverNow: serverNowMs() };
   return jsonResponse(body);
 }

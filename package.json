@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "e2e:prepare": "tsx scripts/e2e-prepare.ts",
     "icons": "tsx scripts/generate-icons.ts",
     "samples": "tsx scripts/generate-samples.ts samples",
     "templates": "tsx scripts/generate-samples.ts templates",

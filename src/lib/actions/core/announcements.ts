@@ -19,6 +19,7 @@ import {
   updateAnnouncement,
 } from "@/lib/db";
 import type { ActionFailure, AnnouncementResult, DeleteAnnouncementResult } from "../types";
+import { serverNowMs } from "@/lib/server/clock";
 import { isFormData, readFlag, readText } from "./form";
 import { failure, validationFailure, type FieldLabels } from "./result";
 
@@ -60,7 +61,7 @@ function readAnnouncementInput(payload: unknown): unknown {
  */
 export async function createAnnouncementFrom(
   payload: unknown,
-  nowMs: number = Date.now(),
+  nowMs: number = serverNowMs(),
 ): Promise<AnnouncementResult> {
   const parsed = announcementInputSchema.safeParse(readAnnouncementInput(payload));
   if (!parsed.success) return validationFailure(parsed.error, { labels: ANNOUNCEMENT_LABELS });
@@ -78,7 +79,7 @@ export async function createAnnouncementFrom(
 export async function updateAnnouncementFrom(
   id: unknown,
   payload: unknown,
-  nowMs: number = Date.now(),
+  nowMs: number = serverNowMs(),
 ): Promise<AnnouncementResult> {
   const key = rowIdSchema.safeParse(id);
   if (!key.success) return announcementGone();
