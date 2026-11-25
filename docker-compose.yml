@@ -1,0 +1,23 @@
+# Run the mosque website on one machine:
+#   1. cp .env.example .env   and set ADMIN_PASSWORD (and SESSION_SECRET)
+#   2. docker compose up -d --build
+# The timetable is stored in the "uwais-data" volume.
+services:
+  web:
+    build:
+      context: .
+      args:
+        BUILD_ID: ${BUILD_ID:-}
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      MOSQUE_TIMEZONE: ${MOSQUE_TIMEZONE:-Europe/London}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+    volumes:
+      - uwais-data:/data
+
+volumes:
+  uwais-data:

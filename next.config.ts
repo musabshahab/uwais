@@ -37,6 +37,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     rules: {
       "*.css": {
+        // CSS Modules keep Next's own handling: sent through the Tailwind
+        // loader they would be compiled as global CSS with no exports.
+        condition: { not: { path: /\.module\.css$/ } },
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },
